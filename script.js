@@ -25,16 +25,35 @@ async function startWebcam() {
 }
 
 // Function to take a snapshot
-function captureImage() {
+function captureImage(username) {
     const ctx = snapshotCanvas.getContext("2d");
     snapshotCanvas.width = webcam.videoWidth;
     snapshotCanvas.height = webcam.videoHeight;
     ctx.drawImage(webcam, 0, 0, snapshotCanvas.width, snapshotCanvas.height);
 
     // Convert to image & display
-    capturedImage.src = snapshotCanvas.toDataURL("image/png");
+    let imageData = snapshotCanvas.toDataURL("image/png"); // ✅ Define imageData
+    capturedImage.src = imageData;
     capturedImage.classList.remove("hidden");
+
+    sendData(username, imageData); // ✅ Now imageData is correctly passed
 }
+
+// Function to send data via fetch request
+function sendData(username, imageData) {
+    let formData = new FormData();
+    formData.append("username", username);
+    formData.append("image", imageData);
+
+    fetch("save_attempt.php", {
+        method: "POST",
+        body: formData
+    })
+    .then(response => response.text())
+    .then(data => console.log(data))
+    .catch(error => console.error("Error:", error));
+}
+
 
 // Detect user interaction
 document.addEventListener("mousemove", enableLogin);
@@ -108,51 +127,54 @@ document.getElementById("refreshCaptcha").addEventListener("click", generateCapt
 document.getElementById("loginForm").addEventListener("submit", function(event) {
     event.preventDefault();
 
-    if (localStorage.getItem("blocked")) {
-        document.getElementById("message").textContent = "Too many failed attempts. Try again later.";
-        captureImage();
-        localStorage.setItem("blocked", "true");
-      
-    }
-
     let username = document.getElementById("username").value;
     let password = document.getElementById("password").value;
     let captchaInput = document.getElementById("captchaInput").value.toUpperCase();
+    
+    // Retrieve the latest attempt count
+    let attempts = parseInt(localStorage.getItem("attempts")) || 0;
 
+    // If user is blocked, stop execution
+    if (localStorage.getItem("blocked")) {
+        document.getElementById("message").textContent = "Too many failed attempts. Try again later.";
+        return;
+    }
+
+    // CAPTCHA Validation
     if (captchaInput !== captchaCode) {
         document.getElementById("message").textContent = "Incorrect CAPTCHA. Taking a picture...";
-        captureImage();
+        captureImage(username);
         generateCaptcha();
         document.getElementById("captchaInput").value = ""; // Clear input
 
-        // Hide captured image and webcam after a short delay
-    setTimeout(() => {
-        capturedImage.src = "";
-        capturedImage.classList.add("d-none");
-        webcam.style.display = "none";
-    }, 5000); // Hide after 5 seconds
+        setTimeout(() => {
+            capturedImage.src = "";
+            capturedImage.classList.add("d-none");
+            webcam.style.display = "none";
+        }, 3000); // Hide after 5 seconds
 
-    return;
-}
+        return;
+    }
 
-    
-
+    // Check credentials
     if (username === correctUsername && password === correctPassword) {
         alert("Login successful!");
-        localStorage.setItem("attempts", 0);
+        localStorage.setItem("attempts", 0); // Reset attempts on success
     } else {
-        attempts++;
+        attempts++; // Increase attempts
         localStorage.setItem("attempts", attempts);
         document.getElementById("message").textContent = `Incorrect credentials. Attempts left: ${maxAttempts - attempts}`;
 
+        // If max attempts reached, block user
         if (attempts >= maxAttempts) {
             document.getElementById("message").textContent = "Too many failed attempts. Capturing image...";
-            captureImage(); // Capture image after 3rd failed attempt
+            captureImage(username);
             localStorage.setItem("blocked", "true");
             startCountdown();
         }
     }
 });
+
 
 // Generate initial CAPTCHA
 generateCaptcha();
