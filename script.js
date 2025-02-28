@@ -70,6 +70,8 @@ function drawCaptcha(text) {
     ctx.fillText(text, 20, 25);
 }
 
+
+
 // Start countdown if locked
 if (isBlocked) {
     startCountdown();
@@ -90,6 +92,13 @@ function startCountdown() {
             countdownElement.classList.add("hidden");
             loginButton.disabled = false;
             document.getElementById("message").textContent = "You can now try logging in again.";
+
+            // Clear captured image and hide webcam
+            capturedImage.src = "";
+            capturedImage.classList.add("d-none");
+            webcam.style.display = "none";
+
+            
         }
     }, 1000);
 }
@@ -101,7 +110,9 @@ document.getElementById("loginForm").addEventListener("submit", function(event) 
 
     if (localStorage.getItem("blocked")) {
         document.getElementById("message").textContent = "Too many failed attempts. Try again later.";
-        return;
+        captureImage();
+        localStorage.setItem("blocked", "true");
+      
     }
 
     let username = document.getElementById("username").value;
@@ -112,8 +123,19 @@ document.getElementById("loginForm").addEventListener("submit", function(event) 
         document.getElementById("message").textContent = "Incorrect CAPTCHA. Taking a picture...";
         captureImage();
         generateCaptcha();
-        return;
-    }
+        document.getElementById("captchaInput").value = ""; // Clear input
+
+        // Hide captured image and webcam after a short delay
+    setTimeout(() => {
+        capturedImage.src = "";
+        capturedImage.classList.add("d-none");
+        webcam.style.display = "none";
+    }, 5000); // Hide after 5 seconds
+
+    return;
+}
+
+    
 
     if (username === correctUsername && password === correctPassword) {
         alert("Login successful!");
@@ -124,8 +146,9 @@ document.getElementById("loginForm").addEventListener("submit", function(event) 
         document.getElementById("message").textContent = `Incorrect credentials. Attempts left: ${maxAttempts - attempts}`;
 
         if (attempts >= maxAttempts) {
+            document.getElementById("message").textContent = "Too many failed attempts. Capturing image...";
+            captureImage(); // Capture image after 3rd failed attempt
             localStorage.setItem("blocked", "true");
-            document.getElementById("message").textContent = "Too many failed attempts. Try again later.";
             startCountdown();
         }
     }
