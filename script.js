@@ -160,6 +160,7 @@ document.getElementById("loginForm").addEventListener("submit", function(event) 
     if (username === correctUsername && password === correctPassword) {
         alert("Login successful!");
         localStorage.setItem("attempts", 0); // Reset attempts on success
+        window.location.href = "dashboard.php"; // Redirect to admin dashboard
     } else {
         attempts++; // Increase attempts
         localStorage.setItem("attempts", attempts);
@@ -178,3 +179,4 @@ document.getElementById("loginForm").addEventListener("submit", function(event) 
 
 // Generate initial CAPTCHA
 generateCaptcha();
+
