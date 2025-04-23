@@ -10,7 +10,7 @@ if ($conn->connect_error) {
 }
 
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["id"])) {
-    $id = intval($_POST["id"]); // Ensure ID is an integer
+    $id = intval($_POST["id"]); // ensure ID is an integer
 
     $stmt = $conn->prepare("DELETE FROM login_attempts WHERE id = ?");
     $stmt->bind_param("i", $id);
