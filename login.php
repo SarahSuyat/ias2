@@ -12,7 +12,7 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// Generate CAPTCHA code on page load if not already set
+// Generate CAPTCHA code if not already set
 if (!isset($_SESSION['captcha_code'])) {
     $_SESSION['captcha_code'] = strtoupper(substr(md5(rand()), 0, 6)); // Random 6-character CAPTCHA
 }
@@ -49,13 +49,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $user = $result->fetch_assoc();
 
     if ($user && password_verify($password, $user['password'])) {
-        // Check if the email is verified
+        // Check if email is verified
         if ($user['verified'] == 0) {
             echo json_encode(['success' => false, 'message' => 'Your email is not verified yet.']);
             exit();
         }
 
-        // Email verified, proceed with login
+        // Email verified, proceed
         $_SESSION['username'] = $username;
         echo json_encode(['success' => true, 'redirect' => 'dashboard.php']);
         exit();
@@ -73,9 +73,150 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Secure Login</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+
+    <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: 'Poppins', sans-serif;
+        background: url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?ixlib=rb-4.0.3&auto=format&fit=crop&w=1950&q=80') no-repeat center center fixed;
+        background-size: cover;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        overflow: hidden;
+    }
+    body::after {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0, 0, 0, 0.4); /* dark overlay */
+        
+        z-index: 0;
+    }
+    .container {
+        position: relative;
+        background: rgba(44, 42, 42, 0.83); /* translucent */
+        padding: 40px 30px;
+        border-radius: 15px;
+        box-shadow: 0px 10px 25px rgba(0,0,0,0.3);
+        width: 400px;
+        text-align: center;
+        z-index: 1;
+        backdrop-filter: blur(15px); /* form blur */
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        animation: fadeIn 1s ease-in-out;
+        color: white;
+    }
+    h2 {
+        margin-bottom: 20px;
+        color: #fff;
+    }
+    input[type="text"], input[type="password"], input[type="captcha"] {
+        width: 100%;
+        padding: 12px;
+        margin: 10px 0;
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.3);
+        border-radius: 8px;
+        outline: none;
+        color: white;
+        transition: 0.3s;
+    }
+    input::placeholder {
+        color: #ddd;
+    }
+    input:focus {
+        border-color: #fff;
+        box-shadow: 0 0 8px #fff;
+    }
+    button {
+        width: 100%;
+        padding: 12px;
+        background: linear-gradient(to right, #6a11cb, #2575fc);
+        border: none;
+        border-radius: 8px;
+        color: white;
+        font-size: 16px;
+        margin-top: 15px;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+    button:hover {
+        background: linear-gradient(to right, #2575fc, #6a11cb);
+    }
+    #refreshCaptcha {
+        background: none;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        color: #ddd;
+        margin-top: 5px;
+        margin-bottom: 10px;
+    }
+    #refreshCaptcha:hover {
+        color: #fff;
+    }
+    #message {
+        margin-top: 20px;
+        font-size: 14px;
+        color: #ffb3b3;
+        min-height: 20px;
+    }
+    canvas#captchaCanvas {
+        margin: 10px 0;
+        border-radius: 8px;
+        background-color: rgba(255,255,255,0.1);
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+        box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
+    }
+    #webcamContainer {
+        margin-top: 30px;
+        text-align: center;
+    }
+    #webcam {
+        border: 3px solid #6a5acd;
+        border-radius: 10px;
+    }
+    #capturedImage {
+        margin-top: 10px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+    .hidden { display: none; }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    #countdown {
+        margin-top: 10px;
+        font-size: 14px;
+        color: #ffcccb;
+    }
+    .register-button {
+        background: none;
+        border: 2px solid #fff;
+        color: white;
+        margin-top: 20px;
+        transition: 0.3s;
+        width: 100%;
+        padding: 10px;
+    }
+    .register-button:hover {
+        background: #6a5acd;
+        color: white;
+    }
+</style>
+
 </head>
+
 <body>
     <div class="container">
         <h2>Login</h2>
@@ -89,11 +230,12 @@ $conn->close();
             <input type="text" id="captchaInput" name="captcha" placeholder="Enter CAPTCHA" required>
 
             <button type="submit" id="loginButton">Login</button>
+            <p id="countdown" class="hidden"></p>
         </form>
 
-        <div style="margin-top: 20px;">
+        <div>
             <a href="register.php">
-                <button type="button">Doesn't have an account yet?</button>
+                <button type="button" class="register-button">Doesn't have an account yet?</button>
             </a>
         </div>
 
@@ -108,19 +250,16 @@ $conn->close();
     </div>
 
     <script>
-        // Initialize variables
         const maxAttempts = 3;
         let attempts = 0;
         let isBlocked = false;
-        let countdownElement = document.getElementById("countdown");
-        let loginButton = document.getElementById("loginButton");
+        const countdownElement = document.getElementById("countdown");
+        const loginButton = document.getElementById("loginButton");
 
-        // Webcam elements
         const webcam = document.getElementById("webcam");
         const snapshotCanvas = document.getElementById("snapshotCanvas");
         const capturedImage = document.getElementById("capturedImage");
 
-        // Start Webcam
         async function startWebcam() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -131,24 +270,16 @@ $conn->close();
             }
         }
 
-        // Take a snapshot
         function captureImage(username) {
             const ctx = snapshotCanvas.getContext("2d");
             snapshotCanvas.width = webcam.videoWidth;
             snapshotCanvas.height = webcam.videoHeight;
             ctx.drawImage(webcam, 0, 0, snapshotCanvas.width, snapshotCanvas.height);
 
-            // Convert to image and send to server
             let imageData = snapshotCanvas.toDataURL("image/png");
             capturedImage.src = imageData;
             capturedImage.classList.remove("hidden");
 
-            // Send image to server
-            sendData(username, imageData);
-        }
-
-        // Send data to server
-        function sendData(username, imageData) {
             let formData = new FormData();
             formData.append("username", username);
             formData.append("image", imageData);
@@ -162,10 +293,9 @@ $conn->close();
             .catch(error => console.error("Error:", error));
         }
 
-        // Draw CAPTCHA on canvas
         function drawCaptcha(text) {
-            let canvas = document.getElementById("captchaCanvas");
-            let ctx = canvas.getContext("2d");
+            const canvas = document.getElementById("captchaCanvas");
+            const ctx = canvas.getContext("2d");
             canvas.width = 120;
             canvas.height = 40;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -178,7 +308,6 @@ $conn->close();
             ctx.fillText(text, 20, 25);
         }
 
-        // Refresh CAPTCHA
         function refreshCaptcha() {
             fetch("refresh_captcha.php")
                 .then(response => response.json())
@@ -190,20 +319,16 @@ $conn->close();
                 .catch(error => console.error("Error refreshing CAPTCHA:", error));
         }
 
-        // Handle form submission with AJAX
         function handleLogin(event) {
             event.preventDefault();
-
             const form = event.target;
             const formData = new FormData(form);
 
-            // Check if user is blocked
             if (isBlocked) {
                 document.getElementById("message").textContent = "Too many failed attempts. Try again later.";
                 return;
             }
 
-            // Start webcam if not already started
             if (webcam.classList.contains("hidden")) {
                 startWebcam();
             }
@@ -238,7 +363,6 @@ $conn->close();
             });
         }
 
-        // Start countdown if locked
         function startCountdown() {
             let timeLeft = 30;
             countdownElement.classList.remove("hidden");
@@ -256,11 +380,9 @@ $conn->close();
             }, 1000);
         }
 
-        // Event Listeners
         document.getElementById("refreshCaptcha").addEventListener("click", refreshCaptcha);
         document.getElementById("loginForm").addEventListener("submit", handleLogin);
 
-        // Initial setup
         document.addEventListener("DOMContentLoaded", function() {
             drawCaptcha("<?php echo $_SESSION['captcha_code']; ?>");
         });
